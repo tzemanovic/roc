@@ -235,7 +235,10 @@ impl Scope {
                     region,
                 };
 
-                Err((*original_region, shadow))
+                // Err((*original_region, shadow))
+                // TODO fake symbol
+                let symbol = Symbol::new(self.home, roc_module::symbol::IdentId(0));
+                Ok(symbol)
             }
             None => {
                 // If this IdentId was already added previously

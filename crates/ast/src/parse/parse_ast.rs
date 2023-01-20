@@ -29,6 +29,7 @@ pub fn parse_from_string<'a>(
 
     let header_str = &code_str[0..blank_line_indx];
     let tail_str = &code_str[blank_line_indx..];
+    dbg!(header_str, tail_str);
 
     let mut scope = Scope::new(env.home, env.pool, env.var_store);
     scope.fill_scope(env, &mut interns.all_ident_ids)?;

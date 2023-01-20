@@ -17,7 +17,7 @@ use roc_ast::mem_pool::pool_str::PoolStr;
 use roc_ast::parse::parse_ast;
 use roc_code_markup::markup::convert::from_ast::ast_to_mark_nodes;
 use roc_code_markup::markup::mark_id_ast_id_map::MarkIdAstIdMap;
-use roc_code_markup::markup::nodes;
+use roc_code_markup::markup::nodes::{self, tree_as_string};
 use roc_code_markup::slow_pool::{MarkNodeId, SlowPool};
 use roc_load::LoadedModule;
 use roc_module::symbol::Interns;
@@ -86,7 +86,7 @@ pub fn init_model<'a>(
 
     for mark_node_id in &markup_ids {
         // for debugging:
-        //println!("{}", tree_as_string(*mark_node_id, &mark_node_pool));
+        println!("{}", tree_as_string(*mark_node_id, &mark_node_pool));
         EdModel::insert_mark_node_between_line(
             &mut line_nr,
             &mut col_nr,

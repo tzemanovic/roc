@@ -588,7 +588,7 @@ impl ModuleIds {
 /// This ID is unique within a given module, not globally - so to turn this back into
 /// a string, you would need a ModuleId, an IdentId, and a Map<ModuleId, Map<IdentId, String>>.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub struct IdentId(u32);
+pub struct IdentId(pub u32);
 
 impl IdentId {
     pub const fn index(self) -> usize {

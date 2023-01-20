@@ -67,18 +67,27 @@ impl<T> RocList<T> {
     }
 
     fn elems_with_capacity(num_elems: usize) -> NonNull<ManuallyDrop<T>> {
-        let alloc_ptr = unsafe { roc_alloc(Self::alloc_bytes(num_elems), Self::alloc_alignment()) };
+        let alloc_ptr = unsafe {
+            roc_alloc(Self::alloc_bytes(num_elems), Self::alloc_alignment())
+        };
 
-        Self::elems_from_allocation(NonNull::new(alloc_ptr).unwrap_or_else(|| {
-            todo!("Call roc_panic with the info that an allocation failed.");
-        }))
+        Self::elems_from_allocation(NonNull::new(alloc_ptr).unwrap_or_else(
+            || {
+                todo!(
+                    "Call roc_panic with the info that an allocation failed."
+                );
+            },
+        ))
     }
 
-    fn elems_from_allocation(allocation: NonNull<c_void>) -> NonNull<ManuallyDrop<T>> {
+    fn elems_from_allocation(
+        allocation: NonNull<c_void>,
+    ) -> NonNull<ManuallyDrop<T>> {
         let alloc_ptr = allocation.as_ptr();
 
         unsafe {
-            let elem_ptr = Self::elem_ptr_from_alloc_ptr(alloc_ptr).cast::<ManuallyDrop<T>>();
+            let elem_ptr = Self::elem_ptr_from_alloc_ptr(alloc_ptr)
+                .cast::<ManuallyDrop<T>>();
 
             // Initialize the reference count.
             alloc_ptr
@@ -155,9 +164,12 @@ impl<T> RocList<T> {
     }
 
     #[inline(always)]
-    fn elements_and_storage(&self) -> Option<(NonNull<ManuallyDrop<T>>, &Cell<Storage>)> {
+    fn elements_and_storage(
+        &self,
+    ) -> Option<(NonNull<ManuallyDrop<T>>, &Cell<Storage>)> {
         let elements = self.elements?;
-        let storage = unsafe { &*self.ptr_to_allocation().cast::<Cell<Storage>>() };
+        let storage =
+            unsafe { &*self.ptr_to_allocation().cast::<Cell<Storage>>() };
         Some((elements, storage))
     }
 
@@ -207,52 +219,59 @@ where
         }
 
         let new_len = self.len() + slice.len();
-        let non_null_elements = if let Some((elements, storage)) = self.elements_and_storage() {
-            // Decrement the list's refence count.
-            let mut copy = storage.get();
-            let is_unique = copy.decrease();
+        let non_null_elements =
+            if let Some((elements, storage)) = self.elements_and_storage() {
+                // Decrement the list's refence count.
+                let mut copy = storage.get();
+                let is_unique = copy.decrease();
 
-            if is_unique {
-                // If we have enough capacity, we can add to the existing elements in-place.
-                if self.capacity() >= slice.len() {
-                    elements
-                } else {
-                    // There wasn't enough capacity, so we need a new allocation.
-                    // Since this is a unique RocList, we can use realloc here.
-                    let new_ptr = unsafe {
-                        roc_realloc(
-                            storage.as_ptr().cast(),
-                            Self::alloc_bytes(new_len),
-                            Self::alloc_bytes(self.capacity),
-                            Self::alloc_alignment(),
+                if is_unique {
+                    // If we have enough capacity, we can add to the existing elements in-place.
+                    if self.capacity() >= slice.len() {
+                        elements
+                    } else {
+                        // There wasn't enough capacity, so we need a new allocation.
+                        // Since this is a unique RocList, we can use realloc here.
+                        let new_ptr = unsafe {
+                            roc_realloc(
+                                storage.as_ptr().cast(),
+                                Self::alloc_bytes(new_len),
+                                Self::alloc_bytes(self.capacity),
+                                Self::alloc_alignment(),
+                            )
+                        };
+
+                        self.capacity = new_len;
+
+                        Self::elems_from_allocation(
+                            NonNull::new(new_ptr).unwrap_or_else(|| {
+                                todo!("Reallocation failed");
+                            }),
                         )
-                    };
+                    }
+                } else {
+                    if !copy.is_readonly() {
+                        // Write the decremented reference count back.
+                        storage.set(copy);
+                    }
 
-                    self.capacity = new_len;
+                    // Allocate new memory.
+                    let new_elements = Self::elems_with_capacity(slice.len());
 
-                    Self::elems_from_allocation(NonNull::new(new_ptr).unwrap_or_else(|| {
-                        todo!("Reallocation failed");
-                    }))
+                    // Copy the old elements to the new allocation.
+                    unsafe {
+                        copy_nonoverlapping(
+                            elements.as_ptr(),
+                            new_elements.as_ptr(),
+                            self.length,
+                        );
+                    }
+
+                    new_elements
                 }
             } else {
-                if !copy.is_readonly() {
-                    // Write the decremented reference count back.
-                    storage.set(copy);
-                }
-
-                // Allocate new memory.
-                let new_elements = Self::elems_with_capacity(slice.len());
-
-                // Copy the old elements to the new allocation.
-                unsafe {
-                    copy_nonoverlapping(elements.as_ptr(), new_elements.as_ptr(), self.length);
-                }
-
-                new_elements
-            }
-        } else {
-            Self::elems_with_capacity(slice.len())
-        };
+                Self::elems_with_capacity(slice.len())
+            };
 
         self.elements = Some(non_null_elements);
 
@@ -327,7 +346,11 @@ impl<T> RocList<T> {
 
                     unsafe {
                         // Copy the old elements to the new allocation.
-                        copy_nonoverlapping(old_elements_ptr, new_elems.as_ptr(), self.length);
+                        copy_nonoverlapping(
+                            old_elements_ptr,
+                            new_elems.as_ptr(),
+                            self.length,
+                        );
                     }
 
                     // Decrease the current allocation's reference count.
@@ -341,7 +364,10 @@ impl<T> RocList<T> {
                             // The new allocation is referencing them, so instead of incrementing them all
                             // all just to decrement them again here, we neither increment nor decrement them.
                             unsafe {
-                                roc_dealloc(self.ptr_to_allocation(), Self::alloc_alignment());
+                                roc_dealloc(
+                                    self.ptr_to_allocation(),
+                                    Self::alloc_alignment(),
+                                );
                             }
                         } else {
                             // Write the storage back.
@@ -381,7 +407,10 @@ impl<T> Deref for RocList<T> {
 
     fn deref(&self) -> &Self::Target {
         if let Some(elements) = self.elements {
-            let elements = ptr::slice_from_raw_parts(elements.as_ptr().cast::<T>(), self.length);
+            let elements = ptr::slice_from_raw_parts(
+                elements.as_ptr().cast::<T>(),
+                self.length,
+            );
 
             unsafe { &*elements }
         } else {
@@ -497,11 +526,16 @@ impl<T> Drop for RocList<T> {
                     unsafe {
                         // Drop the stored elements.
                         for index in 0..self.len() {
-                            ManuallyDrop::drop(&mut *elements.as_ptr().add(index));
+                            ManuallyDrop::drop(
+                                &mut *elements.as_ptr().add(index),
+                            );
                         }
 
                         // Release the memory.
-                        roc_dealloc(self.ptr_to_allocation(), Self::alloc_alignment());
+                        roc_dealloc(
+                            self.ptr_to_allocation(),
+                            Self::alloc_alignment(),
+                        );
                     }
                 } else {
                     // Write the storage back.
@@ -626,7 +660,7 @@ where
 
 // This is a RocList that is checked to ensure it is unique or readonly such that it can be sent between threads safely.
 #[repr(transparent)]
-pub struct SendSafeRocList<T>(RocList<T>);
+pub struct SendSafeRocList<T>(pub RocList<T>);
 
 unsafe impl<T> Send for SendSafeRocList<T> where T: Send {}
 
@@ -687,7 +721,10 @@ where
 {
     type Value = RocList<T>;
 
-    fn expecting(&self, formatter: &mut core::fmt::Formatter) -> core::fmt::Result {
+    fn expecting(
+        &self,
+        formatter: &mut core::fmt::Formatter,
+    ) -> core::fmt::Result {
         write!(formatter, "a list of strings")
     }
 

@@ -54,6 +54,11 @@ pub fn compile_to_mono<'a, 'i, I: Iterator<Item = &'i str>>(
     let filename = PathBuf::from("");
     let src_dir = PathBuf::from("fake/test/path");
     let (bytes_before_expr, module_src) = promote_expr_to_module(arena, defs, expr);
+    println!();
+    println!("==============");
+    println!("MODULE:{module_src}");
+    println!("==============");
+    println!();
     let exposed_types = Default::default();
     let loaded = roc_load::load_and_monomorphize_from_str(
         arena,

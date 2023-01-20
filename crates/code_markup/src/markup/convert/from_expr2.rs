@@ -455,6 +455,24 @@ pub fn expr2_to_markup<'a>(
 
             add_node(function_mn, ast_node_id, mark_node_pool, mark_id_ast_id_map)
         }
+        Expr2::If {
+            cond_var,
+            expr_var,
+            branches,
+            final_else,
+        } => {
+            println!("TODO: If incomplete, using 0 as mark ID: {expr2:?}");
+            0
+        }
+        Expr2::When {
+            cond_var,
+            expr_var,
+            branches,
+            cond,
+        } => {
+            println!("TODO: When incomplete, using 0 as mark ID: {expr2:?}");
+            0
+        }
         Expr2::RuntimeError() => new_markup_node(
             "RunTimeError".to_string(),
             ast_node_id,

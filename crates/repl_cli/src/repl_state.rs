@@ -241,20 +241,42 @@ impl ReplState {
             ParseOutcome::Empty | ParseOutcome::Help | ParseOutcome::Exit => unreachable!(),
         };
 
+        // Override last def if it's already present
+        let mut last_past_def = None;
+        if let Some(opt_var_name) = dbg!(&opt_var_name) {
+            if self.past_def_idents.remove(opt_var_name) {
+                if let Ok(past_def_ix) = self
+                    .past_defs
+                    .binary_search_by(|PastDef { ident, src }| ident.cmp(opt_var_name))
+                {
+                    let past_def = self.past_defs.remove(past_def_ix);
+                    last_past_def = Some(past_def.src);
+                }
+            }
+        }
         // Record e.g. "val1" as a past def, unless our input was exactly the name of
         // an existing identifer (e.g. I just typed "val1" into the prompt - there's no
         // need to reassign "val1" to "val2" just because I wanted to see what its value was!)
         let (output, problems) =
             match opt_var_name.or_else(|| self.past_def_idents.get(src.trim()).cloned()) {
                 Some(existing_ident) => {
-                    opt_var_name = Some(existing_ident);
+                    opt_var_name = Some(existing_ident.clone());
 
-                    gen_and_eval_llvm(
+                    let (output, problems) = gen_and_eval_llvm(
                         self.past_defs.iter().map(|def| def.src.as_str()),
                         src,
                         Triple::host(),
                         OptLevel::Normal,
-                    )
+                    );
+
+                    // Don't persist defs that have compile errors - restore old
+                    // one, if any, instead
+                    if !problems.errors.is_empty() {
+                        if let Some(last_past_def) = last_past_def {
+                            self.add_past_def(existing_ident, last_past_def);
+                        }
+                    }
+                    (output, problems)
                 }
                 None => {
                     let (output, problems) = gen_and_eval_llvm(

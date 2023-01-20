@@ -56,6 +56,39 @@ pub fn toplevel_defs_to_defs2<'a>(
                 }
             }
 
+            Err(roc_parse::ast::ValueDef::AnnotatedBody {
+                ann_pattern,
+                ann_type,
+                comment,
+                body_pattern,
+                body_expr,
+            }) => {
+                let loc_pattern = **ann_pattern;
+                let loc_expr = **body_expr;
+                let expr2 = loc_expr_to_expr2(arena, loc_expr, env, scope, region).0;
+                let expr_id = env.pool.add(expr2);
+
+                use roc_parse::ast::Pattern::*;
+
+                match loc_pattern.value {
+                    Identifier(id_str) => {
+                        let identifier_id = env.ident_ids.get_or_insert(id_str);
+
+                        // TODO support with annotation
+                        Def2::ValueDef {
+                            identifier_id,
+                            expr_id,
+                        }
+                    }
+                    other => {
+                        unimplemented!(
+                            "I don't yet know how to convert the pattern {:?} into an expr2",
+                            other
+                        )
+                    }
+                }
+            }
+
             other => {
                 unimplemented!(
                     "I don't know how to make an expr2 from this def yet: {:?}",

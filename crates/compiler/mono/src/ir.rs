@@ -10261,7 +10261,10 @@ where
     ToLowLevelCall: Fn(ToLowLevelCallArguments<'a>) -> Call<'a> + Copy,
 {
     match lambda_set.call_by_name_options(&layout_cache.interner) {
-        ClosureCallOptions::Void => empty_lambda_set_error(env),
+        ClosureCallOptions::Void => {
+            dbg!("lowlevel_match_on_lambda_set");
+            empty_lambda_set_error(env)
+        },
         ClosureCallOptions::Union(union_layout) => {
             let closure_tag_id_symbol = env.unique_symbol();
 
@@ -10459,8 +10462,13 @@ fn match_on_lambda_set<'a>(
     assigned: Symbol,
     hole: &'a Stmt<'a>,
 ) -> Stmt<'a> {
+            dbg!(&lambda_set.set, &lambda_set.representation,
+        &closure_data_symbol, &argument_symbols, &assigned,&hole);
     match lambda_set.call_by_name_options(&layout_cache.interner) {
-        ClosureCallOptions::Void => empty_lambda_set_error(env),
+        ClosureCallOptions::Void => {
+            dbg!("match_on_lambda_set");
+            empty_lambda_set_error(env)}
+            ,
         ClosureCallOptions::Union(union_layout) => {
             let closure_tag_id_symbol = env.unique_symbol();
 
@@ -10614,6 +10622,7 @@ fn union_lambda_set_to_switch<'a>(
         // there is really nothing we can do here. We generate a runtime error here which allows
         // code gen to proceed. We then assume that we hit another (more descriptive) error before
         // hitting this one
+        dbg!("union_lambda_set_to_switch");
         return empty_lambda_set_error(env);
     }
 
